@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ultimate Tic Tac Toe</title>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: #202020;
+    color: white;
+    text-align: center;
+    margin-top: 40px;
+    transition: background 0.5s, color 0.5s;
+}
+
+h1 { margin-bottom: 10px; }
+
+/* ★ Responsive board */
+.board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    width: 90vw;
+    max-width: 380px;
+    margin: 20px auto;
+}
+
+/* ★ Responsive cells */
+.cell {
+    aspect-ratio: 1 / 1;
+    background: #303030;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(32px, 8vw, 55px);
+    cursor: pointer;
+    transition: 0.2s, background 0.5s;
+}
+
+.cell:hover { background: #444; }
+.highlight { background: #27ae60 !important; }
+
+#status { 
+    margin-top: 15px; 
+    font-size: clamp(18px, 5vw, 24px);
+}
+
+button, select, input[type=range] {
+    margin-top: 20px;
+    padding: 10px 25px;
+    font-size: clamp(14px, 4vw, 18px);
+    cursor: pointer;
+    border-radius: 6px;
+    border: none;
+    transition: 0.2s;
+}
+
+button { background: #3498db; color: white; }
+button:hover { background: #2980b9; }
+
+select { background: #8e44ad; color: white; }
+select:hover { background: #732d91; }
+
+input[type=range] { width: 150px; }
+
+.scoreboard {
+    margin-top: 20px;
+    font-size: clamp(18px, 5vw, 22px);
+}
+
+/* Themes */
+body.light { background: #f0f0f0; color: #222; }
+body.light .cell { background: #ddd; color: #222; }
+body.light .cell:hover { background: #bbb; }
+
+body.neon { background: #000; color: #0ff; }
+body.neon .cell { background: #111; color: #0ff; border: 2px solid #0ff; }
+body.neon .cell:hover { background: #222; }
+</style>
+
+</head>
+<body class="dark">
+
+<h1>Ultimate Tic Tac Toe</h1>
+
+<div>
+    Mode:
+    <select id="mode" onchange="resetGame()">
+        <option value="pve">Player vs AI</option>
+        <option value="pvp">Player vs Player</option>
+    </select>
+    Difficulty:
+    <select id="difficulty" onchange="resetGame()">
+        <option value="easy">Easy</option>
+        <option value="hard">Hard</option>
+        <option value="unbeatable" selected>Unbeatable</option>
+    </select>
+    Theme:
+    <select id="theme" onchange="changeTheme()">
+        <option value="dark">Dark</option>
+        <option value="light">Light</option>
+        <option value="neon">Neon</option>
+    </select>
+</div>
+
+<div class="scoreboard">
+    X Wins: <span id="xWins">0</span> &nbsp; | &nbsp;
+    O Wins: <span id="oWins">0</span> &nbsp; | &nbsp;
+    Draws: <span id="draws">0</span>
+</div>
+
+<div class="board">
+    <div class="cell" onclick="playerMove(0)"></div>
+    <div class="cell" onclick="playerMove(1)"></div>
+    <div class="cell" onclick="playerMove(2)"></div>
+    <div class="cell" onclick="playerMove(3)"></div>
+    <div class="cell" onclick="playerMove(4)"></div>
+    <div class="cell" onclick="playerMove(5)"></div>
+    <div class="cell" onclick="playerMove(6)"></div>
+    <div class="cell" onclick="playerMove(7)"></div>
+    <div class="cell" onclick="playerMove(8)"></div>
+</div>
+
+<p id="status">Your turn (X)</p>
+
+<button onclick="resetGame()">Restart Game</button>
+
+<div>
+    Background Music:
+    <button onclick="toggleMusic()">Play/Pause</button>
+    Volume: <input type="range" min="0" max="1" step="0.05" value="0.5" onchange="setVolume(this.value)">
+</div>
+
+<audio id="bgMusic" src="https://actions.google.com/sounds/v1/ambiences/space_ambience.ogg" loop></audio>
+
+<audio id="clickSound" src="https://actions.google.com/sounds/v1/cartoon/pop.ogg"></audio>
+<audio id="winSound" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"></audio>
+<audio id="drawSound" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg"></audio>
+
+<script>
+let board = ["","","","","","","","",""];
+let gameOver = false;
+let xWins=0,oWins=0,draws=0;
+let turn="X"; // current player
+
+const clickSound = document.getElementById("clickSound");
+const winSound = document.getElementById("winSound");
+const drawSound = document.getElementById("drawSound");
+const bgMusic = document.getElementById("bgMusic");
+
+// PLAYER MOVE
+function playerMove(i){
+    if(gameOver || board[i]!="") return;
+
+    board[i] = turn;
+    clickSound.play();
+    updateBoard();
+
+    if(checkWin(turn)) return win(turn);
+    if(fullBoard()) return draw();
+
+    if(document.getElementById("mode").value==="pve" && turn==="X") {
+        setTimeout(aiMove,300);
+    } else {
+        turn = (turn==="X")?"O":"X";
+        document.getElementById("status").textContent = "Turn: "+turn;
+    }
+}
+
+// AI MOVE
+function aiMove(){
+    if(gameOver) return;
+    let difficulty=document.getElementById("difficulty").value;
+    let move;
+    if(difficulty==="easy") move=randomMove();
+    else if(difficulty==="hard") move=hardMove();
+    else move=unbeatableMove();
+    board[move]="O";
+    clickSound.play();
+    updateBoard();
+
+    if(checkWin("O")) return win("O");
+    if(fullBoard()) return draw();
+}
+
+// EASY AI
+function randomMove(){
+    let empty=board.map((v,i)=>v===""?i:null).filter(v=>v!==null);
+    return empty[Math.floor(Math.random()*empty.length)];
+}
+
+// HARD AI
+function hardMove(){
+    for(let i=0;i<9;i++){if(board[i]===""){board[i]="O";if(checkWin("O")){board[i]="";return i;}board[i]="";}}
+    for(let i=0;i<9;i++){if(board[i]===""){board[i]="X";if(checkWin("X")){board[i]="";return i;}board[i]="";}}
+    return randomMove();
+}
+
+// UNBEATABLE AI
+function unbeatableMove(){
+    let bestScore=-Infinity,move=0;
+    for(let i=0;i<9;i++){
+        if(board[i]===""){
+            board[i]="O";
+            let score=minimax(board,0,false);
+            board[i]="";
+            if(score>bestScore){bestScore=score;move=i;}
+        }
+    }
+    return move;
+}
+
+function minimax(b,depth,isMax){
+    if(checkWin("O")) return 1;
+    if(checkWin("X")) return -1;
+    if(fullBoard()) return 0;
+
+    if(isMax){
+        let best=-Infinity;
+        for(let i=0;i<9;i++){
+            if(b[i]===""){b[i]="O";best=Math.max(best,minimax(b,depth+1,false));b[i]="";}
+        }
+        return best;
+    }else{
+        let best=Infinity;
+        for(let i=0;i<9;i++){
+            if(b[i]===""){b[i]="X";best=Math.min(best,minimax(b,depth+1,true));b[i]="";}
+        }
+        return best;
+    }
+}
+
+function updateBoard(){
+    const cells=document.getElementsByClassName("cell");
+    for(let i=0;i<9;i++){
+        cells[i].textContent=board[i]==="X"?"❌":board[i]==="O"?"⭕":"";
+        cells[i].classList.remove("highlight");
+    }
+}
+
+function win(p){
+    gameOver=true;
+    winSound.play();
+    let combo=winningCombo(p);
+    combo.forEach(i=>document.getElementsByClassName("cell")[i].classList.add("highlight"));
+    document.getElementById("status").textContent=p+" wins!";
+    if(p==="X") xWins++; else oWins++;
+    updateScoreboard();
+}
+
+function draw(){
+    gameOver=true;
+    drawSound.play();
+    document.getElementById("status").textContent="It's a draw!";
+    draws++;
+    updateScoreboard();
+}
+
+function fullBoard(){return board.every(c=>c!=="");}
+function checkWin(p){return winningCombo(p)!==null;}
+
+function winningCombo(p){
+    const combos=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+    for(let c of combos) if(c.every(i=>board[i]===p)) return c;
+    return null;
+}
+
+function updateScoreboard(){
+    document.getElementById("xWins").textContent=xWins;
+    document.getElementById("oWins").textContent=oWins;
+    document.getElementById("draws").textContent=draws;
+}
+
+function resetGame(){
+    board=["","","","","","","","",""];
+    gameOver=false;
+    turn="X";
+    updateBoard();
+    document.getElementById("status").textContent="Your turn (X)";
+}
+
+function changeTheme(){
+    document.body.className=document.getElementById("theme").value;
+}
+
+function toggleMusic(){
+    if(bgMusic.paused) bgMusic.play();
+    else bgMusic.pause();
+}
+
+function setVolume(v){bgMusic.volume=v;}
+</script>
+
+</body>
+</html>
